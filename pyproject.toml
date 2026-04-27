@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geotempfill"
+version = "0.1.0"
+description = "Tensor-completion gap filling for NOAA GHCN-Daily weather station data, based on the HaLRTC algorithm."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Course project — Geospatial Processing"},
+]
+keywords = ["geospatial", "tensor-completion", "weather", "noaa", "ghcn", "interpolation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+]
+
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "matplotlib>=3.6",
+    "requests>=2.28",
+]
+
+[project.optional-dependencies]
+geo = [
+    "geopandas>=1.0",
+    "shapely>=2.0",
+]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+dev = [
+    "geotempfill[geo,test]",
+    "ruff>=0.1",
+]
+
+[project.scripts]
+geotempfill = "geotempfill.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/your-org/geotempfill"
+Documentation = "https://github.com/your-org/geotempfill#readme"
+Repository = "https://github.com/your-org/geotempfill"
+Issues = "https://github.com/your-org/geotempfill/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+geotempfill = ["py.typed"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "network: tests that need internet access (skipped by default)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = ["E501"]
