@@ -64,3 +64,56 @@ def plot_method_comparison(results: Mapping[str, object], metric: str = "rmse"):
     ax.set_title(f"Method comparison: {metric.upper()}")
     ax.grid(True, axis="y", alpha=0.3)
     return fig, ax
+
+def plot_station_error_map(
+    stations: pd.DataFrame,
+    station_errors: pd.Series | pd.DataFrame,
+    error_col: str = "error",
+):
+    """
+    Plot station-level prediction error on a longitude-latitude map.
+
+    stations:
+        DataFrame with latitude and longitude.
+        Index should be station_id, or it should contain station_id column.
+
+    station_errors:
+        Series indexed by station_id, or DataFrame with station_id and error_col.
+    """
+    required = {"latitude", "longitude"}
+    if not required.issubset(stations.columns):
+        raise ValueError("stations must contain latitude and longitude columns")
+
+    stations_plot = stations.copy()
+
+    if "station_id" in stations_plot.columns:
+        stations_plot = stations_plot.set_index("station_id")
+
+    if isinstance(station_errors, pd.Series):
+        errors = station_errors.rename(error_col)
+    else:
+        if "station_id" in station_errors.columns:
+            errors = station_errors.set_index("station_id")[error_col]
+        else:
+            errors = station_errors[error_col]
+
+    stations_plot = stations_plot.join(errors, how="left")
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+
+    sc = ax.scatter(
+        stations_plot["longitude"],
+        stations_plot["latitude"],
+        c=stations_plot[error_col],
+        s=45,
+    )
+
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_title("Station-level prediction error")
+    ax.grid(True, alpha=0.3)
+
+    cbar = fig.colorbar(sc, ax=ax)
+    cbar.set_label(error_col)
+
+    return fig, ax

@@ -72,7 +72,7 @@ class GhcnStation:
         }
 
 
-def _http_get(url: str, *, timeout: float = 30.0, retries: int = 3) -> bytes:
+def _http_get(url: str, *, timeout: float = 120.0, retries: int = 3) -> bytes:
     """Fetch a URL and return raw bytes, with simple retry logic."""
     last_err: Optional[Exception] = None
 
@@ -316,9 +316,11 @@ def fetch_state_data(
         if sub.empty:
             continue
 
-        has_requested_data = any(sub[v].notna().any() for v in variables)
+        has_all_requested_variables = all(
+            sub[v].notna().any() for v in variables
+            )
 
-        if not has_requested_data:
+        if not has_all_requested_variables:
             continue
 
         rows.append(sub)

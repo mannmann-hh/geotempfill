@@ -31,7 +31,15 @@ from .data import (
     list_stations,
 )
 from .evaluation import Metrics, hide_random, score
-from .halrtc import HaLRTCResult, fold, halrtc, svt, unfold
+from .halrtc import (
+    HaLRTCResult,
+    fold,
+    halrtc,
+    svt,
+    unfold,
+    apply_elevation_temperature_correction,
+    inverse_elevation_temperature_correction,
+)
 from .tensor import WeatherTensor, build_tensor
 from .visualize import (
     plot_convergence,

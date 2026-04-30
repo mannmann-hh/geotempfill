@@ -86,7 +86,7 @@ def test_score_perfect_prediction():
         np.array([0, 1, 0, 1]),
     )
 
-    metrics = score(truth, pred, holdout)
+     score(truth, pred, holdout)
 
     assert isinstance(metrics, Metrics)
     assert metrics.n == 4

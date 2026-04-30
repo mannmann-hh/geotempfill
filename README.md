@@ -86,12 +86,12 @@ California is suitable because:
 
 ### 3.3 Demo Configuration
 
-The default demo uses:
+The current demo uses:
 
 ```text
 Region: California (CA)
 Years: 2020–2021
-Variables: TMAX, TMIN
+Variables: TMAX, TMIN, ADPT, ASLP, AWBT
 Stations: 30
 Temporal aggregation: monthly
 ```
@@ -99,14 +99,14 @@ Temporal aggregation: monthly
 The resulting tensor shape is:
 
 ```text
-(variables, time, stations) = (2, 24, 30)
+(variables, time, stations) = (5, 24, 30)
 ```
 
 where:
 
-- `2` = `TMAX`, `TMIN`
+- `5` = `TMAX`, `TMIN`, `ADPT`, `ASLP`, `AWBT`
 - `24` = 24 monthly time steps from 2020 to 2021
-- `30` = selected NOAA stations with valid temperature observations
+- `30` = selected NOAA stations with valid observations for the requested variables
 
 ---
 
@@ -123,13 +123,19 @@ Daily-to-monthly aggregation
         ↓
 Tensor construction
         ↓
+Elevation-based physical correction
+        ↓
+Variable-wise standardization
+        ↓
 Random hold-out masking
         ↓
-HaLRTC tensor completion
+Location-aware HaLRTC tensor completion
+        ↓
+Inverse standardization and inverse physical correction
         ↓
 Baseline comparison
         ↓
-Metric evaluation
+Per-variable metric evaluation
         ↓
 Figure and report generation
 ```
@@ -153,7 +159,7 @@ where:
 For the default California demo:
 
 ```text
-V = 2
+V = 5
 T = 24
 S = 30
 ```
@@ -216,6 +222,22 @@ The implementation follows an ADMM-style iterative procedure:
 
 The implementation is written in NumPy and does not rely on deep learning frameworks.
 
+### 6.4 Location-aware and Physical Correction Extension
+
+The current demo extends the original HaLRTC workflow with two geospatial preprocessing steps.
+
+First, station coordinates are used to compute inverse-distance weights between stations. During completion, missing entries are slightly smoothed using nearby stations:
+
+```text
+X_new = (1 - λ) X_HaLRTC + λ X_spatial
+```
+where `λ` is the spatial smoothing weight.
+
+Second, elevation is used to physically correct temperature variables before tensor completion. For `TMAX` and `TMIN`, the demo applies a simple lapse-rate correction:
+```text
+T_corrected = T + 6.5 × elevation_km
+```
+
 ---
 
 ## 7. Baseline Methods
@@ -255,20 +277,27 @@ Metrics include:
 
 The demo hides 10% of originally observed entries and evaluates each method only on those hidden entries.
 
+Because the variables have different units and scales, the main evaluation is reported per variable instead of using one aggregated RMSE across all variables.
+
 ---
 
 ## 9. Demo Results
 
-A successful California demo produced the following result:
+The current California demo evaluates each variable separately because the variables have different physical units and scales.
+
+A successful run produced the following per-variable results:
 
 ```text
-Method                RMSE        MAE        R^2          r        n
-----------------------------------------------------------------------
-HaLRTC              1.9420     1.5073     0.9620     0.9828      135
-MeanFill            6.6937     5.5346     0.5483     0.7419      135
-TemporalMean        4.3507     3.3805     0.8092     0.9005      135
-IDW                 3.6755     2.6431     0.8638     0.9334      135
+PhysicalLocationHaLRTC
+Variable         RMSE        MAE        R^2          r        n
+------------------------------------------------------------
+TMAX           2.2949     1.6487     0.9248     0.9779       65
+TMIN           1.8666     1.3991     0.8967     0.9533       65
+ADPT          26.0200    15.9951     0.8858     0.9572       69
+ASLP           9.0922     6.8853     0.9571     0.9873       68
+AWBT           7.6595     6.0956     0.9682     0.9882       91
 ```
+MeanFill, TemporalMean, and IDW all show larger RMSE values than HaLRTC across TMAX, TMIN, ADPT, ASLP, and AWBT.
 
 ### Interpretation
 
@@ -422,7 +451,7 @@ python -m geotempfill download `
   --state CA `
   --start-year 2020 `
   --end-year 2021 `
-  --variables TMAX TMIN `
+  --variables TMAX TMIN ADPT ASLP AWBT `
   --max-stations 30 `
   --out-dir data/raw `
   --cache-dir data/cache
@@ -434,7 +463,7 @@ python -m geotempfill download `
 python -m geotempfill benchmark `
   --obs data/raw/observations_CA.csv `
   --stations data/raw/stations_CA.csv `
-  --variables TMAX TMIN `
+  --variables TMAX TMIN ADPT ASLP AWBT `
   --freq MS `
   --hide-fraction 0.1 `
   --rho 0.005 `
@@ -450,10 +479,12 @@ python -m geotempfill benchmark `
 import geotempfill as gtf
 import numpy as np
 
+variables = ["TMAX", "TMIN", "ADPT", "ASLP", "AWBT"]
+
 # Download California data
 obs, stations = gtf.fetch_state_data(
     "CA",
-    variables=["TMAX", "TMIN"],
+    variables=variables,
     years=[2020, 2021],
     max_stations=30,
     cache_dir="data/cache",
@@ -462,33 +493,67 @@ obs, stations = gtf.fetch_state_data(
 # Build tensor
 tensor = gtf.build_tensor(
     obs,
-    variables=["TMAX", "TMIN"],
+    variables=variables,
     time_col="date",
     station_col="station",
     freq="MS",
     station_coords=stations,
 )
 
-# Prepare data for algorithms
+# Prepare data
 data = tensor.fill_for_algorithm()
 
-# Hide 10% of observed entries
+# Apply elevation-based physical correction to TMAX and TMIN
+elevation = tensor.station_coords["elevation"].to_numpy()
+
+data_phys, physical_correction = gtf.apply_elevation_temperature_correction(
+    data,
+    elevation,
+    list(tensor.variables),
+)
+
+# Use station coordinates for location-aware smoothing
+coords = tensor.station_coords[["latitude", "longitude"]].to_numpy()
+
+# Hide 10% of observed entries for evaluation
 rng = np.random.default_rng(0)
 train_mask, holdout = gtf.hide_random(tensor.mask, 0.1, rng=rng)
 
-# Run HaLRTC
+# Run location-aware HaLRTC on physically corrected data
 result = gtf.halrtc(
-    data,
+    data_phys,
     train_mask,
     rho=5e-3,
     max_iter=300,
     tol=1e-5,
+    coords=coords,
+    spatial_weight=0.10,
+    spatial_power=2.0,
+    station_mode=2,
 )
 
-# Evaluate
-metrics = gtf.score(data, result.completed, holdout)
+# Transform predictions back to original physical units
+completed = gtf.inverse_elevation_temperature_correction(
+    result.completed,
+    physical_correction,
+)
 
-print(metrics)
+# Keep training observations fixed
+completed = np.where(train_mask, data, completed)
+
+# Per-variable evaluation, example: TMAX
+v_idx, t_idx, s_idx = holdout
+selected = v_idx == variables.index("TMAX")
+
+tmax_holdout = (
+    v_idx[selected],
+    t_idx[selected],
+    s_idx[selected],
+)
+
+tmax_metrics = gtf.score(data, completed, tmax_holdout)
+
+print(tmax_metrics)
 ```
 
 ---
@@ -516,7 +581,7 @@ results/reports/california_demo_metrics.json
 results/figures/california_station_map.png
 results/figures/california_missing_heatmap.png
 results/figures/california_halrtc_convergence.png
-results/figures/california_method_comparison.png
+results/figures/california_station_error_map.png
 ```
 
 ---
@@ -572,7 +637,7 @@ Main class:
 
 ### `halrtc.py`
 
-Implements HaLRTC.
+Implements HaLRTC and optional location-aware spatial smoothing.
 
 Main functions:
 
@@ -580,6 +645,8 @@ Main functions:
 - `unfold`
 - `fold`
 - `svt`
+- `apply_elevation_temperature_correction`
+- `inverse_elevation_temperature_correction`
 
 Main class:
 
@@ -646,7 +713,9 @@ Current limitations include:
 - no advanced hyperparameter tuning;
 - no uncertainty quantification;
 - no direct comparison with full kriging or Gaussian Process models;
-- the default experiment uses a limited number of stations for reproducibility.
+- the default experiment uses a limited number of stations for reproducibility;
+- physical correction is currently applied only to temperature variables;
+- pressure correction is not yet physically modelled with a logarithmic pressure-height relationship.
 
 ---
 
@@ -661,6 +730,10 @@ Possible extensions include:
 - implementing a PyTorch or GPU-accelerated version;
 - adding uncertainty estimates for reconstructed values;
 - using spatial clustering before tensor completion.
+- implementing pressure-height physical correction for pressure variables;
+- comparing pure HaLRTC, location-aware HaLRTC, and physically corrected HaLRTC;
+- tuning the spatial smoothing weight systematically;
+- evaluating the method across different climate regions.
 
 ---
 
@@ -692,6 +765,6 @@ If using this project in academic work, please cite the methodological reference
 
 ## 23. Summary
 
-`geotempfill` demonstrates that low-rank tensor completion is a useful framework for reconstructing missing geospatial temperature observations.
+`geotempfill` demonstrates that low-rank tensor completion is a useful framework for reconstructing missing geospatial weather observations.
 
-In the California experiment, HaLRTC clearly outperforms simple mean filling, temporal averaging, and inverse-distance weighting, showing the value of modelling weather data as a structured tensor.
+In the California experiment, the location-aware and physically corrected HaLRTC workflow outperforms simple mean filling, temporal averaging, and inverse-distance weighting across multiple meteorological variables. The project shows the value of modelling weather station data as a structured tensor while also incorporating geographic distance and elevation-based physical correction.
