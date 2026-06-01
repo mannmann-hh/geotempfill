@@ -67,11 +67,11 @@ data/cache/
 data/raw/
 
 # Outputs from running examples
-examples/output/
-*.png
-*.jpg
-!docs/figures/*.png
-!docs/figures/*.jpg
+# examples/output/
+# *.png
+# *.jpg
+# !docs/figures/*.png
+# !docs/figures/*.jpg
 
 # but DO keep the small bundled sample CSVs
 !data/sample/*.csv
