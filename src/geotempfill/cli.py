@@ -34,6 +34,7 @@ from .baselines import idw_fill, mean_fill, temporal_mean_fill
 from .data import fetch_state_data
 from .evaluation import hide_random, score
 from .halrtc import halrtc
+from .spatial import cokriging_fill, kriging_fill
 from .tensor import build_tensor
 
 
@@ -119,6 +120,32 @@ def _cmd_benchmark(args: argparse.Namespace) -> int:
         "TempMean": pred_temp,
         "IDW": pred_idw,
     }
+
+    if args.include_kriging:
+        print("Running kriging...")
+        methods["Kriging"] = kriging_fill(
+            data,
+            train_mask,
+            coords=coords,
+            range_km=args.kriging_range_km,
+            nugget=args.kriging_nugget,
+            min_points=args.kriging_min_points,
+            idw_power=args.idw_power,
+        )
+
+    if args.include_cokriging:
+        print("Running cokriging...")
+        methods["Cokriging"] = cokriging_fill(
+            data,
+            train_mask,
+            coords=coords,
+            range_km=args.kriging_range_km,
+            nugget=args.kriging_nugget,
+            min_points=args.cokriging_min_points,
+            max_points=args.cokriging_max_points,
+            idw_power=args.idw_power,
+        )
+
     rows = []
     for name, pred in methods.items():
         m = score(truth, pred, holdout)
@@ -198,6 +225,31 @@ def _build_parser() -> argparse.ArgumentParser:
     p_bm.add_argument("--max-iter", type=int, default=500)
     p_bm.add_argument("--tol", type=float, default=1e-5)
     p_bm.add_argument("--idw-power", type=float, default=2.0)
+    p_bm.add_argument(
+        "--include-kriging",
+        action="store_true",
+        help="also run ordinary kriging as a spatial baseline",
+    )
+    p_bm.add_argument(
+        "--include-cokriging",
+        action="store_true",
+        help="also run experimental simple cokriging as a multivariable spatial baseline",
+    )
+    p_bm.add_argument(
+        "--kriging-range-km",
+        type=float,
+        default=None,
+        help="ordinary kriging covariance range; defaults to median station distance",
+    )
+    p_bm.add_argument("--kriging-nugget", type=float, default=1e-6)
+    p_bm.add_argument("--kriging-min-points", type=int, default=3)
+    p_bm.add_argument("--cokriging-min-points", type=int, default=5)
+    p_bm.add_argument(
+        "--cokriging-max-points",
+        type=int,
+        default=120,
+        help="maximum donor variable-station observations per cokriging solve",
+    )
     p_bm.add_argument("--seed", type=int, default=0)
     p_bm.add_argument("--verbose", action="store_true")
     p_bm.add_argument(

@@ -40,6 +40,7 @@ from .halrtc import (
     apply_elevation_temperature_correction,
     inverse_elevation_temperature_correction,
 )
+from .spatial import cokriging_fill, kriging_fill
 from .tensor import WeatherTensor, build_tensor
 from .visualize import (
     plot_convergence,
@@ -70,6 +71,8 @@ __all__ = [
     "mean_fill",
     "temporal_mean_fill",
     "idw_fill",
+    "kriging_fill",
+    "cokriging_fill",
     # evaluation
     "Metrics",
     "hide_random",

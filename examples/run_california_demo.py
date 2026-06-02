@@ -126,6 +126,34 @@ def _build_parser() -> argparse.ArgumentParser:
         default=300,
         help="Maximum number of HaLRTC iterations.",
     )
+    parser.add_argument(
+        "--skip-kriging",
+        action="store_true",
+        help="Do not run the ordinary kriging baseline.",
+    )
+    parser.add_argument(
+        "--skip-cokriging",
+        action="store_true",
+        help="Do not run the experimental simple cokriging baseline.",
+    )
+    parser.add_argument(
+        "--kriging-range-km",
+        type=float,
+        default=None,
+        help="Kriging/cokriging covariance range; defaults to median station distance.",
+    )
+    parser.add_argument(
+        "--kriging-nugget",
+        type=float,
+        default=1e-6,
+        help="Small diagonal stabilizer for kriging/cokriging systems.",
+    )
+    parser.add_argument(
+        "--cokriging-max-points",
+        type=int,
+        default=120,
+        help="Maximum donor variable-station observations per cokriging solve.",
+    )
     return parser
 
 
@@ -178,6 +206,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Max stations:   {max_stations}")
     print(f"Hide fraction:  {hide_fraction}")
     print(f"Spatial weight: {spatial_weight}")
+    print(f"Kriging:        {not args.skip_kriging}")
+    print(f"Cokriging:      {not args.skip_cokriging}")
     print(f"Output group:   {output_label}")
     print("============================================================")
 
@@ -312,6 +342,29 @@ def main(argv: list[str] | None = None) -> int:
         "IDW": pred_idw,
     }
 
+    if not args.skip_kriging:
+        print("Running Kriging...")
+        predictions["Kriging"] = gtf.kriging_fill(
+            data,
+            train_mask,
+            coords=coords,
+            range_km=args.kriging_range_km,
+            nugget=args.kriging_nugget,
+            idw_power=2.0,
+        )
+
+    if not args.skip_cokriging:
+        print("Running Cokriging...")
+        predictions["Cokriging"] = gtf.cokriging_fill(
+            data,
+            train_mask,
+            coords=coords,
+            range_km=args.kriging_range_km,
+            nugget=args.kriging_nugget,
+            max_points=args.cokriging_max_points,
+            idw_power=2.0,
+        )
+
     # --------------------------------------------------------------
     # Per-variable metrics
     # --------------------------------------------------------------
@@ -372,6 +425,11 @@ def main(argv: list[str] | None = None) -> int:
             "tol": tol,
             "spatial_weight": spatial_weight,
             "spatial_power": spatial_power,
+            "run_kriging": not args.skip_kriging,
+            "run_cokriging": not args.skip_cokriging,
+            "kriging_range_km": args.kriging_range_km,
+            "kriging_nugget": args.kriging_nugget,
+            "cokriging_max_points": args.cokriging_max_points,
             "standardized_by_variable": True,
             "physical_correction": {
                 "enabled": True,
