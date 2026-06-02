@@ -177,6 +177,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=0.10,
         help="Smoothing strength for empirical-Bayes station effects.",
     )
+    parser.add_argument(
+        "--bayes-spatial-neighbors",
+        type=int,
+        default=8,
+        help="Nearest neighbors used for empirical-Bayes station-effect smoothing.",
+    )
     return parser
 
 
@@ -398,6 +404,7 @@ def main(argv: list[str] | None = None) -> int:
             shrinkage=args.bayes_shrinkage,
             temporal_smoothing=args.bayes_temporal_smoothing,
             spatial_smoothing=args.bayes_spatial_smoothing,
+            spatial_neighbors=args.bayes_spatial_neighbors,
         )
 
     # --------------------------------------------------------------
@@ -469,6 +476,7 @@ def main(argv: list[str] | None = None) -> int:
             "bayes_shrinkage": args.bayes_shrinkage,
             "bayes_temporal_smoothing": args.bayes_temporal_smoothing,
             "bayes_spatial_smoothing": args.bayes_spatial_smoothing,
+            "bayes_spatial_neighbors": args.bayes_spatial_neighbors,
             "standardized_by_variable": True,
             "physical_correction": {
                 "enabled": True,

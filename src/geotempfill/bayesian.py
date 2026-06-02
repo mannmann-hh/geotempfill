@@ -80,7 +80,11 @@ def _smooth_time_effect(effect: np.ndarray, strength: float) -> np.ndarray:
     return (1.0 - strength) * effect + strength * smoothed
 
 
-def _distance_weights(coords: np.ndarray, power: float = 2.0) -> np.ndarray:
+def _distance_weights(
+    coords: np.ndarray,
+    power: float = 2.0,
+    spatial_neighbors: Optional[int] = None,
+) -> np.ndarray:
     coords = np.asarray(coords, dtype=float)
     if coords.ndim != 2 or coords.shape[1] != 2:
         raise ValueError("coords must have shape (n_stations, 2)")
@@ -99,6 +103,18 @@ def _distance_weights(coords: np.ndarray, power: float = 2.0) -> np.ndarray:
         weights = 1.0 / np.maximum(dist, 1e-9) ** power
     np.fill_diagonal(weights, 0.0)
 
+    if spatial_neighbors is not None:
+        if spatial_neighbors < 1:
+            raise ValueError("spatial_neighbors must be at least 1")
+        if spatial_neighbors < weights.shape[1] - 1:
+            keep = np.argpartition(-weights, spatial_neighbors - 1, axis=1)[
+                :, :spatial_neighbors
+            ]
+            sparse = np.zeros_like(weights)
+            rows = np.arange(weights.shape[0])[:, None]
+            sparse[rows, keep] = weights[rows, keep]
+            weights = sparse
+
     row_sum = weights.sum(axis=1, keepdims=True)
     return np.divide(weights, row_sum, out=np.zeros_like(weights), where=row_sum > 0)
 
@@ -107,6 +123,7 @@ def _smooth_station_effect(
     effect: np.ndarray,
     coords: Optional[np.ndarray],
     strength: float,
+    spatial_neighbors: Optional[int],
 ) -> np.ndarray:
     if strength <= 0.0:
         return effect
@@ -116,7 +133,7 @@ def _smooth_station_effect(
     if coords is None:
         return effect
 
-    weights = _distance_weights(coords)
+    weights = _distance_weights(coords, spatial_neighbors=spatial_neighbors)
     smoothed = effect @ weights.T
     return (1.0 - strength) * effect + strength * smoothed
 
@@ -129,6 +146,7 @@ def empirical_bayes_fill(
     shrinkage: float = 5.0,
     temporal_smoothing: float = 0.20,
     spatial_smoothing: float = 0.10,
+    spatial_neighbors: Optional[int] = 8,
     max_iter: int = 100,
     tol: float = 1e-6,
     return_result: bool = False,
@@ -180,7 +198,12 @@ def empirical_bayes_fill(
         residual = z - time_eff[:, :, None]
         station_eff = _regularized_mean(residual, mask, axis=1, shrinkage=shrinkage)
         station_eff = station_eff - station_eff.mean(axis=1, keepdims=True)
-        station_eff = _smooth_station_effect(station_eff, coords, spatial_smoothing)
+        station_eff = _smooth_station_effect(
+            station_eff,
+            coords,
+            spatial_smoothing,
+            spatial_neighbors,
+        )
 
         delta = np.linalg.norm(time_eff - prev_time) + np.linalg.norm(
             station_eff - prev_station

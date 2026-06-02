@@ -41,8 +41,9 @@ from .halrtc import (
     apply_elevation_temperature_correction,
     inverse_elevation_temperature_correction,
 )
+from .methods import DEFAULT_METHODS, METHODS, FillMethod, run_fill_method
 from .spatial import cokriging_fill, kriging_fill
-from .tensor import WeatherTensor, build_tensor
+from .tensor import NDTensor, WeatherTensor, build_nd_tensor, build_tensor
 from .visualize import (
     plot_convergence,
     plot_method_comparison,
@@ -62,7 +63,9 @@ __all__ = [
     "fold",
     # tensor construction
     "build_tensor",
+    "build_nd_tensor",
     "WeatherTensor",
+    "NDTensor",
     # data
     "GhcnStation",
     "list_stations",
@@ -76,6 +79,10 @@ __all__ = [
     "cokriging_fill",
     "empirical_bayes_fill",
     "EmpiricalBayesResult",
+    "FillMethod",
+    "METHODS",
+    "DEFAULT_METHODS",
+    "run_fill_method",
     # evaluation
     "Metrics",
     "hide_random",

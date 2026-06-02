@@ -23,7 +23,34 @@ from typing import Iterable, Optional, Sequence
 import numpy as np
 import pandas as pd
 
-__all__ = ["WeatherTensor", "build_tensor"]
+__all__ = ["WeatherTensor", "NDTensor", "build_tensor", "build_nd_tensor"]
+
+
+@dataclass
+class NDTensor:
+    """An N-dimensional tensor with named axes and an observation mask.
+
+    This generic container is useful outside the weather-station setting. For
+    example, syndromic surveillance data can be represented as
+    ``(syndrome, quarter, city)`` or ``(syndrome, week, city, age_group)``.
+    """
+
+    data: np.ndarray
+    mask: np.ndarray
+    dims: list[str]
+    coordinates: dict[str, list]
+
+    @property
+    def shape(self) -> tuple:
+        return self.data.shape
+
+    @property
+    def missing_rate(self) -> float:
+        return float(1.0 - self.mask.mean())
+
+    def fill_for_algorithm(self) -> np.ndarray:
+        out = np.where(self.mask, self.data, 0.0)
+        return out.astype(float)
 
 
 @dataclass
@@ -225,4 +252,91 @@ def build_tensor(
         times=time_index,
         stations=station_list,
         station_coords=coords,
+    )
+
+
+def build_nd_tensor(
+    df: pd.DataFrame,
+    *,
+    index_cols: Sequence[str],
+    value_col: str,
+    coordinates: Optional[dict[str, Iterable]] = None,
+    aggfunc: str = "mean",
+) -> NDTensor:
+    """Build a generic N-dimensional tensor from a long-format table.
+
+    Parameters
+    ----------
+    df:
+        Long table containing one row per observed tensor cell.
+    index_cols:
+        Columns that define the tensor axes, in axis order.
+    value_col:
+        Numeric column holding the observed value.
+    coordinates:
+        Optional explicit coordinate values for one or more axes. Missing axes
+        are inferred from the data and sorted.
+    aggfunc:
+        Aggregation used when duplicate coordinates appear. One of
+        ``"mean"``, ``"first"``, or ``"median"``.
+    """
+    if not index_cols:
+        raise ValueError("index_cols must contain at least one column")
+    missing_cols = set(index_cols) - set(df.columns)
+    if missing_cols:
+        raise ValueError(f"missing index columns in df: {sorted(missing_cols)}")
+    if value_col not in df.columns:
+        raise ValueError(f"value column '{value_col}' not found in df")
+    if aggfunc not in {"mean", "first", "median"}:
+        raise ValueError("aggfunc must be one of 'mean', 'first', or 'median'")
+
+    coordinates = coordinates or {}
+    work = df.loc[:, list(index_cols) + [value_col]].copy()
+    work[value_col] = pd.to_numeric(work[value_col], errors="coerce")
+    work = work.dropna(subset=[value_col])
+
+    axis_values: dict[str, list] = {}
+    axis_maps: dict[str, dict] = {}
+
+    for col in index_cols:
+        if col in coordinates:
+            values = list(coordinates[col])
+        else:
+            values = sorted(work[col].dropna().unique().tolist())
+
+        if not values:
+            raise ValueError(f"axis '{col}' has no coordinate values")
+
+        axis_values[col] = values
+        axis_maps[col] = {value: i for i, value in enumerate(values)}
+
+    shape = tuple(len(axis_values[col]) for col in index_cols)
+    data = np.full(shape, np.nan, dtype=float)
+
+    ix_cols = []
+    for col in index_cols:
+        ix_col = f"__{col}_ix"
+        work[ix_col] = work[col].map(axis_maps[col])
+        ix_cols.append(ix_col)
+
+    work = work.dropna(subset=ix_cols)
+    for ix_col in ix_cols:
+        work[ix_col] = work[ix_col].astype(int)
+
+    if aggfunc == "mean":
+        grouped = work.groupby(ix_cols, as_index=False)[value_col].mean()
+    elif aggfunc == "first":
+        grouped = work.groupby(ix_cols, as_index=False)[value_col].first()
+    else:
+        grouped = work.groupby(ix_cols, as_index=False)[value_col].median()
+
+    index = tuple(grouped[ix_col].to_numpy() for ix_col in ix_cols)
+    data[index] = grouped[value_col].to_numpy()
+    mask = ~np.isnan(data)
+
+    return NDTensor(
+        data=data,
+        mask=mask,
+        dims=list(index_cols),
+        coordinates=axis_values,
     )

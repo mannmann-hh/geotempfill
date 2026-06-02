@@ -35,6 +35,7 @@ from .bayesian import empirical_bayes_fill
 from .data import fetch_state_data
 from .evaluation import hide_random, score
 from .halrtc import halrtc
+from .methods import DEFAULT_METHODS, METHODS, run_fill_method
 from .spatial import cokriging_fill, kriging_fill
 from .tensor import build_tensor
 
@@ -103,60 +104,40 @@ def _cmd_benchmark(args: argparse.Namespace) -> int:
     truth = data.copy()
     coords = tensor.station_coords[["latitude", "longitude"]].to_numpy()
 
-    print("\nRunning HaLRTC...")
-    halrtc_res = halrtc(
-        data, train_mask,
-        rho=args.rho, max_iter=args.max_iter, tol=args.tol, verbose=args.verbose,
-    )
-    print(f"  iterations={halrtc_res.n_iter}, converged={halrtc_res.converged}")
+    method_names = list(args.methods or DEFAULT_METHODS)
+    if args.include_kriging and "kriging" not in method_names:
+        method_names.append("kriging")
+    if args.include_cokriging and "cokriging" not in method_names:
+        method_names.append("cokriging")
+    if args.include_bayes and "empirical_bayes" not in method_names:
+        method_names.append("empirical_bayes")
 
-    print("Running baselines...")
-    pred_mean = mean_fill(data, train_mask)
-    pred_temp = temporal_mean_fill(data, train_mask)
-    pred_idw = idw_fill(data, train_mask, coords=coords, power=args.idw_power)
-
-    methods = {
-        "HaLRTC": halrtc_res.completed,
-        "MeanFill": pred_mean,
-        "TempMean": pred_temp,
-        "IDW": pred_idw,
+    method_ctx = {
+        "data": data,
+        "mask": train_mask,
+        "coords": coords,
+        "rho": args.rho,
+        "max_iter": args.max_iter,
+        "tol": args.tol,
+        "verbose": args.verbose,
+        "idw_power": args.idw_power,
+        "kriging_range_km": args.kriging_range_km,
+        "kriging_nugget": args.kriging_nugget,
+        "kriging_min_points": args.kriging_min_points,
+        "cokriging_min_points": args.cokriging_min_points,
+        "cokriging_max_points": args.cokriging_max_points,
+        "bayes_shrinkage": args.bayes_shrinkage,
+        "bayes_temporal_smoothing": args.bayes_temporal_smoothing,
+        "bayes_spatial_smoothing": args.bayes_spatial_smoothing,
+        "bayes_spatial_neighbors": args.bayes_spatial_neighbors,
     }
 
-    if args.include_kriging:
-        print("Running kriging...")
-        methods["Kriging"] = kriging_fill(
-            data,
-            train_mask,
-            coords=coords,
-            range_km=args.kriging_range_km,
-            nugget=args.kriging_nugget,
-            min_points=args.kriging_min_points,
-            idw_power=args.idw_power,
-        )
-
-    if args.include_cokriging:
-        print("Running cokriging...")
-        methods["Cokriging"] = cokriging_fill(
-            data,
-            train_mask,
-            coords=coords,
-            range_km=args.kriging_range_km,
-            nugget=args.kriging_nugget,
-            min_points=args.cokriging_min_points,
-            max_points=args.cokriging_max_points,
-            idw_power=args.idw_power,
-        )
-
-    if args.include_bayes:
-        print("Running empirical Bayes...")
-        methods["EmpBayes"] = empirical_bayes_fill(
-            data,
-            train_mask,
-            coords=coords,
-            shrinkage=args.bayes_shrinkage,
-            temporal_smoothing=args.bayes_temporal_smoothing,
-            spatial_smoothing=args.bayes_spatial_smoothing,
-        )
+    methods = {}
+    print("\nRunning methods...")
+    for method_name in method_names:
+        print(f"Running {method_name}...")
+        label, pred = run_fill_method(method_name, **method_ctx)
+        methods[label] = pred
 
     rows = []
     for name, pred in methods.items():
@@ -229,6 +210,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--variables", nargs="+", default=["TMAX", "TMIN", "PRCP"],
     )
     p_bm.add_argument(
+        "--methods",
+        nargs="+",
+        choices=sorted(METHODS),
+        default=None,
+        help=(
+            "methods to run; default is "
+            + ", ".join(DEFAULT_METHODS)
+        ),
+    )
+    p_bm.add_argument(
         "--freq", default="MS",
         help="pandas frequency string, e.g. 'D', 'MS' (month start), 'QS'",
     )
@@ -270,6 +261,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_bm.add_argument("--bayes-shrinkage", type=float, default=5.0)
     p_bm.add_argument("--bayes-temporal-smoothing", type=float, default=0.20)
     p_bm.add_argument("--bayes-spatial-smoothing", type=float, default=0.10)
+    p_bm.add_argument("--bayes-spatial-neighbors", type=int, default=8)
     p_bm.add_argument("--seed", type=int, default=0)
     p_bm.add_argument("--verbose", action="store_true")
     p_bm.add_argument(
