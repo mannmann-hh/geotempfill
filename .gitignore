@@ -76,3 +76,6 @@ data/raw/
 # but DO keep the small bundled sample CSVs
 !data/sample/*.csv
 !data/sample/*.md
+
+# some backup files with "_backup" suffix
+*_backup.*

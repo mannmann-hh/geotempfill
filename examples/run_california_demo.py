@@ -24,6 +24,7 @@ Outputs:
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -83,18 +84,63 @@ def metric_to_dict(m):
     }
 
 
-def main() -> int:
+def format_fraction_label(fraction: float) -> str:
+    """Format a fraction as a filesystem-safe percentage label."""
+    pct = fraction * 100.0
+    text = f"{pct:.2f}".rstrip("0").rstrip(".")
+    text = text.replace(".", "p")
+    return f"missing_{text}pct"
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Run the California geotempfill demo with configurable holdout rate."
+    )
+    parser.add_argument(
+        "--hide-fraction",
+        type=float,
+        default=0.10,
+        help="Fraction of originally observed entries to hide for testing.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Random seed used when selecting held-out test entries.",
+    )
+    parser.add_argument(
+        "--max-stations",
+        type=int,
+        default=30,
+        help="Maximum number of stations to use when downloading fresh data.",
+    )
+    parser.add_argument(
+        "--spatial-weight",
+        type=float,
+        default=0.10,
+        help="Weight for location-aware smoothing inside HaLRTC.",
+    )
+    parser.add_argument(
+        "--max-iter",
+        type=int,
+        default=300,
+        help="Maximum number of HaLRTC iterations.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _build_parser().parse_args(argv)
+
+    if not 0.0 < args.hide_fraction < 1.0:
+        raise ValueError("--hide-fraction must be between 0 and 1")
+    if not 0.0 <= args.spatial_weight <= 1.0:
+        raise ValueError("--spatial-weight must be between 0 and 1")
+
     project_root = Path(__file__).resolve().parents[1]
 
     raw_dir = project_root / "data" / "raw"
     cache_dir = project_root / "data" / "cache"
-    figures_dir = project_root / "results" / "figures"
-    reports_dir = project_root / "results" / "reports"
-
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    figures_dir.mkdir(parents=True, exist_ok=True)
-    reports_dir.mkdir(parents=True, exist_ok=True)
 
     obs_path = raw_dir / "observations_CA.csv"
     stations_path = raw_dir / "stations_CA.csv"
@@ -102,17 +148,26 @@ def main() -> int:
     state = "CA"
     years = [2020, 2021]
     variables = ["TMAX", "TMIN", "ADPT", "ASLP", "AWBT"]
-    max_stations = 30
+    max_stations = args.max_stations
 
-    hide_fraction = 0.10
-    seed = 0
+    hide_fraction = args.hide_fraction
+    seed = args.seed
 
     rho = 5e-3
-    max_iter = 300
+    max_iter = args.max_iter
     tol = 1e-5
 
-    spatial_weight = 0.10
+    spatial_weight = args.spatial_weight
     spatial_power = 2.0
+
+    output_label = f"{format_fraction_label(hide_fraction)}_seed{seed}"
+    figures_dir = project_root / "results" / "figures" / output_label
+    reports_dir = project_root / "results" / "reports" / output_label
+
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir.mkdir(parents=True, exist_ok=True)
 
     print("============================================================")
     print("geotempfill California demo")
@@ -123,6 +178,7 @@ def main() -> int:
     print(f"Max stations:   {max_stations}")
     print(f"Hide fraction:  {hide_fraction}")
     print(f"Spatial weight: {spatial_weight}")
+    print(f"Output group:   {output_label}")
     print("============================================================")
 
     if obs_path.exists() and stations_path.exists():
@@ -309,6 +365,7 @@ def main() -> int:
             "variables": variables,
             "max_stations": max_stations,
             "hide_fraction": hide_fraction,
+            "output_group": output_label,
             "seed": seed,
             "rho": rho,
             "max_iter": max_iter,
