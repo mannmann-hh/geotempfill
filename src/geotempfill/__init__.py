@@ -24,6 +24,7 @@ end-to-end walkthrough including baseline comparisons and figures.
 """
 
 from .baselines import idw_fill, mean_fill, temporal_mean_fill
+from .bayesian import EmpiricalBayesResult, empirical_bayes_fill
 from .data import (
     GhcnStation,
     fetch_state_data,
@@ -73,6 +74,8 @@ __all__ = [
     "idw_fill",
     "kriging_fill",
     "cokriging_fill",
+    "empirical_bayes_fill",
+    "EmpiricalBayesResult",
     # evaluation
     "Metrics",
     "hide_random",

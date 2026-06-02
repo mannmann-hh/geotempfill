@@ -23,9 +23,13 @@
     "spatial_power": 2.0,
     "run_kriging": true,
     "run_cokriging": true,
+    "run_empirical_bayes": true,
     "kriging_range_km": null,
     "kriging_nugget": 1e-06,
     "cokriging_max_points": 120,
+    "bayes_shrinkage": 5.0,
+    "bayes_temporal_smoothing": 0.2,
+    "bayes_spatial_smoothing": 0.1,
     "standardized_by_variable": true,
     "physical_correction": {
       "enabled": true,
@@ -271,6 +275,43 @@
         "mae": 5.554984162692354,
         "r2": 0.960443305019183,
         "r": 0.9801939266087296,
+        "n": 91
+      }
+    },
+    "EmpiricalBayes": {
+      "TMAX": {
+        "rmse": 4.627483472218594,
+        "mae": 3.5690514054954687,
+        "r2": 0.6944165864469451,
+        "r": 0.8641613072244307,
+        "n": 65
+      },
+      "TMIN": {
+        "rmse": 2.649532915090723,
+        "mae": 2.0177469479494365,
+        "r2": 0.7919704558830493,
+        "r": 0.8941694088774854,
+        "n": 65
+      },
+      "ADPT": {
+        "rmse": 43.277228075879144,
+        "mae": 28.54236406913908,
+        "r2": 0.684067767878262,
+        "r": 0.8623581101037161,
+        "n": 69
+      },
+      "ASLP": {
+        "rmse": 21.09508017419291,
+        "mae": 16.767133481147674,
+        "r2": 0.7691453683040601,
+        "r": 0.9037316559877976,
+        "n": 68
+      },
+      "AWBT": {
+        "rmse": 16.1825182640771,
+        "mae": 12.51842992809827,
+        "r2": 0.8580911735875889,
+        "r": 0.9345656000199095,
         "n": 91
       }
     }

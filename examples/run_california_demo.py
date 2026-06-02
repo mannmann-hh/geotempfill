@@ -137,6 +137,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Do not run the experimental simple cokriging baseline.",
     )
     parser.add_argument(
+        "--skip-bayes",
+        action="store_true",
+        help="Do not run the lightweight empirical-Bayes baseline.",
+    )
+    parser.add_argument(
         "--kriging-range-km",
         type=float,
         default=None,
@@ -153,6 +158,24 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=120,
         help="Maximum donor variable-station observations per cokriging solve.",
+    )
+    parser.add_argument(
+        "--bayes-shrinkage",
+        type=float,
+        default=5.0,
+        help="Shrinkage strength for the empirical-Bayes additive baseline.",
+    )
+    parser.add_argument(
+        "--bayes-temporal-smoothing",
+        type=float,
+        default=0.20,
+        help="Smoothing strength for empirical-Bayes time effects.",
+    )
+    parser.add_argument(
+        "--bayes-spatial-smoothing",
+        type=float,
+        default=0.10,
+        help="Smoothing strength for empirical-Bayes station effects.",
     )
     return parser
 
@@ -208,6 +231,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Spatial weight: {spatial_weight}")
     print(f"Kriging:        {not args.skip_kriging}")
     print(f"Cokriging:      {not args.skip_cokriging}")
+    print(f"Emp Bayes:      {not args.skip_bayes}")
     print(f"Output group:   {output_label}")
     print("============================================================")
 
@@ -365,6 +389,17 @@ def main(argv: list[str] | None = None) -> int:
             idw_power=2.0,
         )
 
+    if not args.skip_bayes:
+        print("Running Empirical Bayes...")
+        predictions["EmpiricalBayes"] = gtf.empirical_bayes_fill(
+            data,
+            train_mask,
+            coords=coords,
+            shrinkage=args.bayes_shrinkage,
+            temporal_smoothing=args.bayes_temporal_smoothing,
+            spatial_smoothing=args.bayes_spatial_smoothing,
+        )
+
     # --------------------------------------------------------------
     # Per-variable metrics
     # --------------------------------------------------------------
@@ -427,9 +462,13 @@ def main(argv: list[str] | None = None) -> int:
             "spatial_power": spatial_power,
             "run_kriging": not args.skip_kriging,
             "run_cokriging": not args.skip_cokriging,
+            "run_empirical_bayes": not args.skip_bayes,
             "kriging_range_km": args.kriging_range_km,
             "kriging_nugget": args.kriging_nugget,
             "cokriging_max_points": args.cokriging_max_points,
+            "bayes_shrinkage": args.bayes_shrinkage,
+            "bayes_temporal_smoothing": args.bayes_temporal_smoothing,
+            "bayes_spatial_smoothing": args.bayes_spatial_smoothing,
             "standardized_by_variable": True,
             "physical_correction": {
                 "enabled": True,

@@ -31,6 +31,7 @@ import pandas as pd
 
 from . import __version__
 from .baselines import idw_fill, mean_fill, temporal_mean_fill
+from .bayesian import empirical_bayes_fill
 from .data import fetch_state_data
 from .evaluation import hide_random, score
 from .halrtc import halrtc
@@ -146,6 +147,17 @@ def _cmd_benchmark(args: argparse.Namespace) -> int:
             idw_power=args.idw_power,
         )
 
+    if args.include_bayes:
+        print("Running empirical Bayes...")
+        methods["EmpBayes"] = empirical_bayes_fill(
+            data,
+            train_mask,
+            coords=coords,
+            shrinkage=args.bayes_shrinkage,
+            temporal_smoothing=args.bayes_temporal_smoothing,
+            spatial_smoothing=args.bayes_spatial_smoothing,
+        )
+
     rows = []
     for name, pred in methods.items():
         m = score(truth, pred, holdout)
@@ -250,6 +262,14 @@ def _build_parser() -> argparse.ArgumentParser:
         default=120,
         help="maximum donor variable-station observations per cokriging solve",
     )
+    p_bm.add_argument(
+        "--include-bayes",
+        action="store_true",
+        help="also run a lightweight empirical-Bayes additive baseline",
+    )
+    p_bm.add_argument("--bayes-shrinkage", type=float, default=5.0)
+    p_bm.add_argument("--bayes-temporal-smoothing", type=float, default=0.20)
+    p_bm.add_argument("--bayes-spatial-smoothing", type=float, default=0.10)
     p_bm.add_argument("--seed", type=int, default=0)
     p_bm.add_argument("--verbose", action="store_true")
     p_bm.add_argument(
