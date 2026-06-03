@@ -300,15 +300,7 @@ def main(argv: list[str] | None = None) -> int:
         elevation,
         list(tensor.variables),
         )
-
-    # --------------------------------------------------------------
-    # Standardize each variable separately after physical correction
-    # --------------------------------------------------------------
-    data_std, var_means, var_stds = standardize_by_variable(
-        data_phys,
-        tensor.mask,
-    )
-
+    
     print("\n[3/6] Creating held-out test entries...")
 
     rng = np.random.default_rng(seed)
@@ -317,6 +309,19 @@ def main(argv: list[str] | None = None) -> int:
         hide_fraction,
         rng=rng,
     )
+
+    # --------------------------------------------------------------
+    # Standardize each variable separately after physical correction.
+    # IMPORTANT: use train_mask, NOT tensor.mask, so the per-variable
+    # mean/std are computed from training entries only and the held-out
+    # test entries do not leak into the standardisation statistics.
+    # --------------------------------------------------------------
+    data_std, var_means, var_stds = standardize_by_variable(
+        data_phys,
+        train_mask,
+    )
+
+
 
     n_observed = int(tensor.mask.sum())
     n_holdout = int(len(holdout[0]))
