@@ -139,3 +139,28 @@ class TestBuildTensor:
         np.testing.assert_array_equal(out[~t.mask], 0.0)
         # Where mask is True, original (non-NaN) values must be preserved.
         np.testing.assert_array_equal(out[t.mask], t.data[t.mask])
+
+    def test_daily_to_monthly_aggregation(self):
+        """Daily input + freq='MS' must produce a real monthly mean per
+        (var, station, month), not just pick the value from the 1st of
+        the month.
+
+        Regression test for the silent ``build_tensor`` bug where non-daily
+        frequencies skipped the snap-to-grid step and only kept rows whose
+        timestamp happened to match a grid point exactly.
+        """
+        dates = pd.date_range("2020-01-01", "2020-03-31", freq="D")
+        df = pd.DataFrame({
+            "station": ["A"] * len(dates),
+            "date": dates,
+            "TMAX": np.arange(len(dates), dtype=float),
+        })
+        t = build_tensor(df, variables=["TMAX"], freq="MS")
+
+        assert t.shape == (1, 3, 1)
+        # Jan: 31 days valued 0..30  -> mean 15.0
+        assert abs(t.data[0, 0, 0] - 15.0) < 1e-9
+        # Feb (2020 is leap): 29 days valued 31..59  -> mean 45.0
+        assert abs(t.data[0, 1, 0] - 45.0) < 1e-9
+        # Mar: 31 days valued 60..90  -> mean 75.0
+        assert abs(t.data[0, 2, 0] - 75.0) < 1e-9
