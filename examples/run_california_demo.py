@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 
 import geotempfill as gtf
-from geotempfill.visualize import plot_station_error_map
+
 
 
 
@@ -561,7 +561,7 @@ def main(argv: list[str] | None = None) -> int:
         .mean()
     )
 
-    fig, _ = plot_station_error_map(
+    fig, _ = gtf.plot_station_error_map(
         tensor.station_coords,
         station_errors,
         error_col="error",
