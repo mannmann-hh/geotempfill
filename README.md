@@ -316,19 +316,121 @@ where `<X>` comes from `--hide-fraction` and `<S>` from `--seed`.
 
 ## Main Modules
 
-```text
-src/geotempfill/
-  data.py        NOAA station metadata and observations
-  tensor.py      weather-specific 3-D tensors and generic N-D tensors
-  halrtc.py      HaLRTC, tensor unfolding utilities, physical correction
-  baselines.py   mean fill, temporal mean, IDW
-  spatial.py     ordinary kriging and simple cokriging
-  bayesian.py    empirical-Bayes additive baseline
-  methods.py     method registry used by the CLI and demo
-  evaluation.py  hold-out masking and metrics
-  visualize.py   plotting helpers
-  cli.py         command-line interface
-```
+### `data.py`
+
+Downloads NOAA station metadata and observations.
+
+Main functions:
+
+- `list_stations`
+- `fetch_station_data`
+- `fetch_state_data`
+
+### `tensor.py`
+
+Builds dense tensors and observation masks for both 3-D weather data and generic N-D layouts.
+
+Main functions:
+
+- `build_tensor`
+- `build_nd_tensor`
+
+Main classes:
+
+- `WeatherTensor`
+- `NDTensor`
+
+### `halrtc.py`
+
+Implements HaLRTC plus optional location-aware spatial smoothing and elevation-based physical correction.
+
+Main functions:
+
+- `halrtc`
+- `unfold`
+- `fold`
+- `svt`
+- `apply_elevation_temperature_correction`
+- `inverse_elevation_temperature_correction`
+
+Main class:
+
+- `HaLRTCResult`
+
+### `baselines.py`
+
+Implements the lightweight baseline methods.
+
+Main functions:
+
+- `mean_fill`
+- `temporal_mean_fill`
+- `idw_fill`
+- `haversine_km`
+
+### `spatial.py`
+
+Implements ordinary kriging and a simple cokriging baseline.
+
+Main functions:
+
+- `kriging_fill`
+- `cokriging_fill`
+
+### `bayesian.py`
+
+Implements the empirical-Bayes additive baseline.
+
+Main function:
+
+- `empirical_bayes_fill`
+
+Main class:
+
+- `EmpiricalBayesResult`
+
+### `methods.py`
+
+Method registry used by the CLI and the demo.
+
+Main function:
+
+- `run_fill_method`
+
+Main constants:
+
+- `METHODS`
+- `DEFAULT_METHODS`
+
+Main class:
+
+- `FillMethod`
+
+### `evaluation.py`
+
+Implements hold-out masking and evaluation metrics.
+
+Main functions:
+
+- `hide_random`
+- `score`
+
+Main class:
+
+- `Metrics`
+
+### `visualize.py`
+
+Implements plotting helpers.
+
+Main functions:
+
+- `plot_station_map`
+- `plot_missing_heatmap`
+- `plot_convergence`
+- `plot_method_comparison`
+- `plot_station_error_map`
+
 
 The main public API is available through:
 
@@ -374,6 +476,24 @@ Possible extensions include larger-scale experiments across multiple states, add
 
 ---
 
+## Future Work
+
+Possible extensions include:
+
+- larger-scale experiments across multiple states;
+- adding more variables such as precipitation, wind, and humidity;
+- using seasonal decomposition before tensor completion;
+- comparing with kriging or Gaussian Process regression;
+- implementing a PyTorch or GPU-accelerated version;
+- adding uncertainty estimates for reconstructed values;
+- using spatial clustering before tensor completion.
+- implementing pressure-height physical correction for pressure variables;
+- comparing pure HaLRTC, location-aware HaLRTC, and physically corrected HaLRTC;
+- tuning the spatial smoothing weight systematically;
+- evaluating the method across different climate regions.
+
+---
+
 ## License
 
 This project is released under the MIT License. See `LICENSE` for details.
@@ -402,4 +522,6 @@ If using this project in academic work, please cite the methodological reference
 
 ## Summary
 
-`geotempfill` demonstrates that low-rank tensor completion is a useful framework for reconstructing missing geospatial weather observations. The project shows the value of modelling weather station data as a structured tensor while also incorporating geographic distance and elevation-based physical correction.
+`geotempfill` demonstrates that low-rank tensor completion is a useful framework for reconstructing missing geospatial weather observations.
+
+In the California experiment, the location-aware and physically corrected HaLRTC workflow outperforms simple mean filling, temporal averaging, and inverse-distance weighting across multiple meteorological variables. The project shows the value of modelling weather station data as a structured tensor while also incorporating geographic distance and elevation-based physical correction.
