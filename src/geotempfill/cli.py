@@ -24,21 +24,15 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 import numpy as np
 import pandas as pd
 
 from . import __version__
-from .baselines import idw_fill, mean_fill, temporal_mean_fill
-from .bayesian import empirical_bayes_fill
 from .data import fetch_state_data
 from .evaluation import hide_random, score
-from .halrtc import halrtc
 from .methods import DEFAULT_METHODS, METHODS, run_fill_method
-from .spatial import cokriging_fill, kriging_fill
 from .tensor import build_tensor
-
 
 # ---------------------------------------------------------------------------
 # `download` subcommand
@@ -274,7 +268,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     return args.func(args)
