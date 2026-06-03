@@ -165,6 +165,58 @@ This can still be a 3-D tensor, such as `syndrome x quarter x city`. The differe
 
 ---
 
+## Repository Structure
+
+```text
+geotempfill/
+├── src/
+│   └── geotempfill/
+│       ├── __init__.py
+│       ├── __main__.py
+│       ├── baselines.py
+│       ├── bayesian.py
+│       ├── cli.py
+│       ├── data.py
+│       ├── evaluation.py
+│       ├── halrtc.py
+│       ├── methods.py
+│       ├── spatial.py
+│       ├── tensor.py
+│       ├── visualize.py
+│       └── py.typed
+│
+├── examples/
+│   └── run_california_demo.py
+│
+├── tests/
+│   ├── test_baselines.py
+│   ├── test_bayesian.py
+│   ├── test_evaluation.py
+│   ├── test_halrtc.py
+│   ├── test_methods.py
+│   ├── test_nd_tensor.py
+│   ├── test_spatial.py
+│   └── test_tensor.py
+│
+├── data/
+│   ├── raw/
+│   ├── cache/
+│   ├── processed/
+│   └── sample/
+│
+├── results/
+│   ├── figures/
+│   └── reports/
+│
+├── .gitignore
+├── environment.yml
+├── LICENSE
+├── pyproject.toml
+└── README.md
+```
+
+---
+
 ## California Demo
 
 Run the full demo from the project root:
@@ -316,123 +368,42 @@ where `<X>` comes from `--hide-fraction` and `<S>` from `--seed`.
 
 ## Main Modules
 
-### `data.py`
+### Data and Tensor Construction
 
-Downloads NOAA station metadata and observations.
+- `data.py`: NOAA station metadata and observations.
+  - Functions: `list_stations`, `fetch_station_data`, `fetch_state_data`
+  - Class: `GhcnStation`
+- `tensor.py`: tensor construction and observation masks.
+  - Functions: `build_tensor`, `build_nd_tensor`
+  - Classes: `WeatherTensor`, `NDTensor`
 
-Main functions:
+### Completion Methods
 
-- `list_stations`
-- `fetch_station_data`
-- `fetch_state_data`
+- `halrtc.py`: HaLRTC completion, tensor unfolding utilities, and elevation-based physical correction.
+  - Functions: `halrtc`, `unfold`, `fold`, `svt`, `apply_elevation_temperature_correction`, `inverse_elevation_temperature_correction`
+  - Class: `HaLRTCResult`
+- `baselines.py`: lightweight baseline methods.
+  - Functions: `mean_fill`, `temporal_mean_fill`, `idw_fill`, `haversine_km`
+- `spatial.py`: ordinary kriging and simple cokriging baselines.
+  - Functions: `kriging_fill`, `cokriging_fill`
+- `bayesian.py`: empirical-Bayes additive baseline.
+  - Function: `empirical_bayes_fill`
+  - Class: `EmpiricalBayesResult`
 
-### `tensor.py`
+### Evaluation and Workflow
 
-Builds dense tensors and observation masks for both 3-D weather data and generic N-D layouts.
+- `evaluation.py`: hold-out masking and metrics.
+  - Functions: `hide_random`, `score`
+  - Class: `Metrics`
+- `methods.py`: method registry used by the CLI and the California demo.
+  - Function: `run_fill_method`
+  - Constants: `METHODS`, `DEFAULT_METHODS`
+  - Class: `FillMethod`
+- `visualize.py`: plotting helpers for maps, missingness, convergence, and station-level errors.
+  - Functions: `plot_station_map`, `plot_missing_heatmap`, `plot_convergence`, `plot_method_comparison`, `plot_station_error_map`
+- `cli.py`: command-line interface for downloading data and running benchmarks.
 
-Main functions:
-
-- `build_tensor`
-- `build_nd_tensor`
-
-Main classes:
-
-- `WeatherTensor`
-- `NDTensor`
-
-### `halrtc.py`
-
-Implements HaLRTC plus optional location-aware spatial smoothing and elevation-based physical correction.
-
-Main functions:
-
-- `halrtc`
-- `unfold`
-- `fold`
-- `svt`
-- `apply_elevation_temperature_correction`
-- `inverse_elevation_temperature_correction`
-
-Main class:
-
-- `HaLRTCResult`
-
-### `baselines.py`
-
-Implements the lightweight baseline methods.
-
-Main functions:
-
-- `mean_fill`
-- `temporal_mean_fill`
-- `idw_fill`
-- `haversine_km`
-
-### `spatial.py`
-
-Implements ordinary kriging and a simple cokriging baseline.
-
-Main functions:
-
-- `kriging_fill`
-- `cokriging_fill`
-
-### `bayesian.py`
-
-Implements the empirical-Bayes additive baseline.
-
-Main function:
-
-- `empirical_bayes_fill`
-
-Main class:
-
-- `EmpiricalBayesResult`
-
-### `methods.py`
-
-Method registry used by the CLI and the demo.
-
-Main function:
-
-- `run_fill_method`
-
-Main constants:
-
-- `METHODS`
-- `DEFAULT_METHODS`
-
-Main class:
-
-- `FillMethod`
-
-### `evaluation.py`
-
-Implements hold-out masking and evaluation metrics.
-
-Main functions:
-
-- `hide_random`
-- `score`
-
-Main class:
-
-- `Metrics`
-
-### `visualize.py`
-
-Implements plotting helpers.
-
-Main functions:
-
-- `plot_station_map`
-- `plot_missing_heatmap`
-- `plot_convergence`
-- `plot_method_comparison`
-- `plot_station_error_map`
-
-
-The main public API is available through:
+Most public functions are available through:
 
 ```python
 import geotempfill as gtf
