@@ -48,6 +48,7 @@ from .visualize import (
     plot_convergence,
     plot_method_comparison,
     plot_missing_heatmap,
+    plot_station_error_map,
     plot_station_map,
 )
 
@@ -61,6 +62,8 @@ __all__ = [
     "svt",
     "unfold",
     "fold",
+    "apply_elevation_temperature_correction",
+    "inverse_elevation_temperature_correction",
     # tensor construction
     "build_tensor",
     "build_nd_tensor",
@@ -92,4 +95,5 @@ __all__ = [
     "plot_missing_heatmap",
     "plot_convergence",
     "plot_method_comparison",
+    "plot_station_error_map",
 ]

@@ -242,7 +242,7 @@ T_corrected = T + 6.5 × elevation_km
 
 ## 7. Baseline Methods
 
-The project compares HaLRTC with three simpler baselines.
+The project compares HaLRTC with six simpler baselines.
 
 ### 7.1 MeanFill
 
@@ -261,6 +261,31 @@ This captures temporal variation but ignores station identity.
 Uses Inverse Distance Weighting over station coordinates.
 
 For each missing value, nearby stations at the same time step contribute more strongly than distant stations.
+
+### 7.4 Ordinary Kriging
+
+Uses an exponential covariance model over station coordinates. For each `(variable, time)` slice, observed stations are donors and missing stations are predicted by solving the ordinary kriging system with an estimated sill and a configurable range (default: median station distance). Falls back to IDW for time slices where too few stations are observed.
+
+### 7.5 Cokriging (simple)
+
+A lightweight multivariable spatial baseline based on a separable covariance model:
+
+```text
+cov((var_i, station_a), (var_j, station_b))
+    = corr(var_i, var_j) * exp(-distance(a, b) / range)
+```
+
+Variables are standardised before the inter-variable correlation matrix is fitted and predictions are inverse-standardised back to the original units. Useful as a multivariable spatial comparator, but not a strict reproduction of a full linear model of coregionalization.
+
+### 7.6 Empirical Bayes
+
+A variable-specific additive decomposition fitted on observed entries only:
+
+```text
+z[v, t, s] = time_effect[v, t] + station_effect[v, s]
+```
+
+Effects are estimated with shrinkage and optional temporal/spatial smoothing. Deterministic empirical-Bayes-style: no MCMC, no posterior samples.
 
 ---
 
@@ -321,10 +346,13 @@ geotempfill/
 │       ├── __init__.py
 │       ├── __main__.py
 │       ├── baselines.py
+│       ├── bayesian.py
 │       ├── cli.py
 │       ├── data.py
 │       ├── evaluation.py
 │       ├── halrtc.py
+│       ├── methods.py
+│       ├── spatial.py
 │       ├── tensor.py
 │       ├── visualize.py
 │       └── py.typed
@@ -334,8 +362,12 @@ geotempfill/
 │
 ├── tests/
 │   ├── test_baselines.py
+│   ├── test_bayesian.py
 │   ├── test_evaluation.py
 │   ├── test_halrtc.py
+│   ├── test_methods.py
+│   ├── test_nd_tensor.py
+│   ├── test_spatial.py
 │   └── test_tensor.py
 │
 ├── data/
@@ -572,17 +604,19 @@ data/raw/stations_CA.csv
 ### 15.2 Reports
 
 ```text
-results/reports/california_demo_metrics.json
+results/reports/missing_<X>pct_seed<S>/california_demo_metrics.json
 ```
 
 ### 15.3 Figures
 
 ```text
-results/figures/california_station_map.png
-results/figures/california_missing_heatmap.png
-results/figures/california_halrtc_convergence.png
-results/figures/california_station_error_map.png
+results/figures/missing_<X>pct_seed<S>/california_station_map.png
+results/figures/missing_<X>pct_seed<S>/california_missing_heatmap.png
+results/figures/missing_<X>pct_seed<S>/california_halrtc_convergence.png
+results/figures/missing_<X>pct_seed<S>/california_station_error_map.png
 ```
+
+where `<X>` comes from `--hide-fraction` and `<S>` from `--seed`. The default run produces a folder named `missing_10pct_seed0/`.
 
 ---
 
@@ -625,19 +659,21 @@ Main functions:
 
 ### `tensor.py`
 
-Builds a dense tensor and observation mask.
+Builds dense tensors and observation masks for both 3-D weather data and generic N-D layouts.
 
-Main function:
+Main functions:
 
 - `build_tensor`
+- `build_nd_tensor`
 
-Main class:
+Main classes:
 
 - `WeatherTensor`
+- `NDTensor`
 
 ### `halrtc.py`
 
-Implements HaLRTC and optional location-aware spatial smoothing.
+Implements HaLRTC plus optional location-aware spatial smoothing and elevation-based physical correction.
 
 Main functions:
 
@@ -654,17 +690,56 @@ Main class:
 
 ### `baselines.py`
 
-Implements baseline methods.
+Implements the lightweight baseline methods.
 
 Main functions:
 
 - `mean_fill`
 - `temporal_mean_fill`
 - `idw_fill`
+- `haversine_km`
+
+### `spatial.py`
+
+Implements ordinary kriging and a simple cokriging baseline.
+
+Main functions:
+
+- `kriging_fill`
+- `cokriging_fill`
+
+### `bayesian.py`
+
+Implements the empirical-Bayes additive baseline.
+
+Main function:
+
+- `empirical_bayes_fill`
+
+Main class:
+
+- `EmpiricalBayesResult`
+
+### `methods.py`
+
+Method registry used by the CLI and the demo.
+
+Main function:
+
+- `run_fill_method`
+
+Main constants:
+
+- `METHODS`
+- `DEFAULT_METHODS`
+
+Main class:
+
+- `FillMethod`
 
 ### `evaluation.py`
 
-Implements hold-out masking and metrics.
+Implements hold-out masking and evaluation metrics.
 
 Main functions:
 
@@ -685,6 +760,7 @@ Main functions:
 - `plot_missing_heatmap`
 - `plot_convergence`
 - `plot_method_comparison`
+- `plot_station_error_map`
 
 ---
 

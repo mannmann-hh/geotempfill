@@ -207,12 +207,21 @@ def build_tensor(
     work = work.dropna(subset=["__sid_ix"])
     work["__sid_ix"] = work["__sid_ix"].astype(int)
 
-    # Floor / round timestamps to the regular grid step
+# Snap each observation to its corresponding grid point. For daily
+    # freq we floor to "D"; for any other freq (MS, QS, W, ...) we use
+    # searchsorted so that an observation falling between two grid points
+    # is assigned to the most recent grid point that precedes it. This
+    # makes the downstream groupby.mean() act as a true bucket
+    # aggregation (e.g. daily -> monthly mean).
     if freq.upper().startswith("D"):
         work["__t"] = work[time_col].dt.floor("D")
     else:
-        # Use the index's freq inference if available; otherwise reindex by nearest
-        work["__t"] = work[time_col]
+        ts = pd.DatetimeIndex(work[time_col])
+        grid_pos = time_index.searchsorted(ts, side="right") - 1
+        in_range = grid_pos >= 0
+        work = work.loc[in_range].copy()
+        grid_pos = grid_pos[in_range]
+        work["__t"] = time_index[grid_pos]
 
     t_to_ix = {t: i for i, t in enumerate(time_index)}
     work["__t_ix"] = work["__t"].map(t_to_ix)
