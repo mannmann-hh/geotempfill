@@ -96,9 +96,10 @@ def _cmd_benchmark(args: argparse.Namespace) -> int:
     # Hide a random fraction of *observed* entries for evaluation.
     rng = np.random.default_rng(args.seed)
     train_mask, holdout = hide_random(tensor.mask, args.hide_fraction, rng=rng)
+    n_holdout = int(holdout[0].size)
     print(
-        f"Held out {holdout.size:,} entries "
-        f"({holdout.size / tensor.mask.sum():.1%} of observed)"
+        f"Held out {n_holdout:,} entries "
+        f"({n_holdout / tensor.mask.sum():.1%} of observed)"
     )
 
     truth = data.copy()
